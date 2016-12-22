@@ -8,7 +8,7 @@ import (
 
 var mutex sync.Mutex
 
-func getTimestampMs() float64 {
+func GetTimestampMs() float64 {
 	return float64(time.Now().UnixNano()/int64(time.Millisecond)) / 1000.0
 }
 
@@ -47,7 +47,7 @@ func (e *ExponentialBackoffReplayer) PutUnackedMessage(messageId int, encodedMes
 
 func (e ExponentialBackoffReplayer) getReplayTimestampFromAttempt(attemptNumber int) float64 {
 	offset := math.Pow(2, float64(attemptNumber)) * e.timeoutSeconds
-	return getTimestampMs() + offset
+	return GetTimestampMs() + offset
 }
 
 func (e *ExponentialBackoffReplayer) AckMessage(messageId int) {
@@ -100,7 +100,7 @@ func (e ExponentialBackoffReplayer) PeekNextUnackedTimestamp() float64 {
 	defer mutex.Unlock()
 
 	if len(e.idToContent) == 0 {
-		return getTimestampMs() + e.timeoutSeconds
+		return GetTimestampMs() + e.timeoutSeconds
 	}
 	return e.getMinimumTimestamp()
 }
