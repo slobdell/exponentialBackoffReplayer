@@ -8,7 +8,7 @@ import (
 
 var mutex sync.Mutex
 
-func GetTimestampMs() float64 {
+func getTimestampMs() float64 {
 	return float64(time.Now().UnixNano()/int64(time.Millisecond)) / 1000.0
 }
 
@@ -38,11 +38,16 @@ func (e *ExponentialBackoffReplayer) PutUnackedMessage(messageId int, encodedMes
 
 	e.idToContent[messageId] = encodedMessage
 	e.idToAttempt[messageId] = attemptNumber
-	offset := math.Pow(2, float64(attemptNumber)) * e.timeoutSeconds
-	replayAt := GetTimestampMs() + offset
+
+	replayAt := e.getReplayTimestampFromAttempt(attemptNumber)
 
 	e.secondaryIdxTimestamp[replayAt] = append(e.secondaryIdxTimestamp[replayAt], messageId)
 	e.secondaryIdxTimestampInv[messageId] = replayAt
+}
+
+func (e ExponentialBackoffReplayer) getReplayTimestampFromAttempt(attemptNumber int) float64 {
+	offset := math.Pow(2, float64(attemptNumber)) * e.timeoutSeconds
+	return getTimestampMs() + offset
 }
 
 func (e *ExponentialBackoffReplayer) AckMessage(messageId int) {
@@ -57,7 +62,10 @@ func (e *ExponentialBackoffReplayer) ackMessageAssumeLocked(messageId int) {
 	}
 	delete(e.idToContent, messageId)
 	delete(e.idToAttempt, messageId)
+	e.deleteSecondaryIdx(messageId)
+}
 
+func (e *ExponentialBackoffReplayer) deleteSecondaryIdx(messageId int) {
 	replayAt := e.secondaryIdxTimestampInv[messageId]
 	delete(e.secondaryIdxTimestampInv, messageId)
 
@@ -92,7 +100,7 @@ func (e ExponentialBackoffReplayer) PeekNextUnackedTimestamp() float64 {
 	defer mutex.Unlock()
 
 	if len(e.idToContent) == 0 {
-		return GetTimestampMs() + e.timeoutSeconds
+		return getTimestampMs() + e.timeoutSeconds
 	}
 	return e.getMinimumTimestamp()
 }
